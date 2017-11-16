@@ -56,6 +56,7 @@ import requests
 #################################################################
 
 def process_row_to_db(conn, data_row, comment, hostname):
+
     insert_stmt = "INSERT OR IGNORE INTO adstxt (SITE_DOMAIN, EXCHANGE_DOMAIN, SELLER_ACCOUNT_ID, ACCOUNT_TYPE, TAG_ID, ENTRY_COMMENT) VALUES (?, ?, ?, ?, ?, ? );"
     exchange_host     = ''
     seller_account_id = ''
@@ -86,7 +87,7 @@ def process_row_to_db(conn, data_row, comment, hostname):
     if(len(seller_account_id) < 1):
         data_valid = 0
 
-    ## ads.txt supports 'DIRECT' and 'RESELLER'
+    ## ads.txt supports 'DIRECT' and 'RESELLER' AND now 'DELEGATED'
     if(len(account_type) < 6):
         data_valid = 0
 
@@ -111,7 +112,12 @@ def process_row_to_db(conn, data_row, comment, hostname):
 #
 #################################################################
 
-def crawl_to_db(conn, crawl_url_queue):
+def crawl_to_db(conn, crawl_url_queue, hop = None):
+    #set default hop value to 0
+    if hop is None:
+        hop = 0
+
+    delegated_url_queue = {}
 
     rowcnt = 0
 
@@ -119,6 +125,7 @@ def crawl_to_db(conn, crawl_url_queue):
             'User-Agent': 'AdsTxtCrawler/1.0; +https://github.com/InteractiveAdvertisingBureau/adstxtcrawler',
             'Accept': 'text/plain',
         }
+
 
     for aurl in crawl_url_queue:
         ahost = crawl_url_queue[aurl]
@@ -143,6 +150,7 @@ def crawl_to_db(conn, crawl_url_queue):
                 line_reader = csv.reader(tmp_csv_file, delimiter='#', quotechar='|')
                 comment = ''
 
+
                 for line in line_reader:
                     logging.debug("DATA:  %s" % line)
 
@@ -151,7 +159,6 @@ def crawl_to_db(conn, crawl_url_queue):
                     except:
                         data_line = "";
 
-                    #determine delimiter, conservative = do it per row
                     if data_line.find(",") != -1:
                         data_delimiter = ','
                     elif data_line.find("\t") != -1:
@@ -167,6 +174,15 @@ def crawl_to_db(conn, crawl_url_queue):
 
                         if (len(line) > 1) and (len(line[1]) > 0):
                              comment = line[1]
+
+                        #check for any rows with "DELEGATED" tag
+                        if any("DELEGATED" in s for s in row) and hop < max_hops:
+                            delegated_url_queue.update({row[0]:ahost})
+                            row = []
+                            rowcnt = rowcnt + crawl_to_db(conn, delegated_url_queue,hop + 1)
+                        elif any("DELEGATED" in s for s in row) and hop >= max_hops:
+                            continue
+
 
                         rowcnt = rowcnt + process_row_to_db(conn, row, comment, ahost)
 
@@ -224,7 +240,9 @@ def load_url_queue(csvfilename, url_queue):
 
     return cnt
 
-# end load_url_queue  #####
+
+
+
 
 #### MAIN ####
 
@@ -253,6 +271,8 @@ crawl_url_queue = {}
 conn = None
 cnt_urls = 0
 cnt_records = 0
+#set the number of allowed delegation hops
+max_hops = 1
 
 cnt_urls = load_url_queue(options.target_filename, crawl_url_queue)
 
@@ -264,9 +284,7 @@ with conn:
     if(cnt_records > 0):
         conn.commit()
     #conn.close()
-
 print "Wrote %d records from %d URLs to %s" % (cnt_records, cnt_urls, options.target_database)
 
 logging.warning("Wrote %d records from %d URLs to %s" % (cnt_records, cnt_urls, options.target_database))
 logging.warning("Finished.")
-
