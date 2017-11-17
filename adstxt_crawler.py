@@ -157,6 +157,7 @@ def crawl_to_db(conn, crawl_url_queue, hop = None):
                     except:
                         data_line = "";
 
+                    #determine delimiter, conservative = do it per row
                     if data_line.find(",") != -1:
                         data_delimiter = ','
                     elif data_line.find("\t") != -1:
