@@ -126,7 +126,6 @@ def crawl_to_db(conn, crawl_url_queue, hop = None):
             'Accept': 'text/plain',
         }
 
-
     for aurl in crawl_url_queue:
         ahost = crawl_url_queue[aurl]
         logging.info(" Crawling  %s : %s " % (aurl, ahost))
@@ -149,7 +148,6 @@ def crawl_to_db(conn, crawl_url_queue, hop = None):
                 #read the line, split on first comment and keep what is to the left (if any found)
                 line_reader = csv.reader(tmp_csv_file, delimiter='#', quotechar='|')
                 comment = ''
-
 
                 for line in line_reader:
                     logging.debug("DATA:  %s" % line)
@@ -182,7 +180,6 @@ def crawl_to_db(conn, crawl_url_queue, hop = None):
                             rowcnt = rowcnt + crawl_to_db(conn, delegated_url_queue,hop + 1)
                         elif any("DELEGATED" in s for s in row) and hop >= max_hops:
                             continue
-
 
                         rowcnt = rowcnt + process_row_to_db(conn, row, comment, ahost)
 
@@ -239,10 +236,7 @@ def load_url_queue(csvfilename, url_queue):
                 cnt = cnt + 1
 
     return cnt
-
-
-
-
+# end load_url_queue  #####
 
 #### MAIN ####
 
